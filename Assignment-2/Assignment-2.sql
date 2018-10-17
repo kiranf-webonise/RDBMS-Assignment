@@ -2,7 +2,6 @@
 
 /* create database ecommerce; */
 
-
 /*Create table users*/
 
 create table users(id SERIAL PRIMARY KEY,name text check(name ~ '^[a-zA-Z]*$') NOT NULL,email varchar(40) UNIQUE NOT NULL,password char(20) check(length(password)>7),type int NOT NULL);
@@ -32,6 +31,7 @@ alter table variants add FOREIGN KEY (product_id) REFERENCES products(id);
 
 /*Queries */
 
+
 insert into products(name)values('shirts');
 insert into products(name)values('pants');
 insert into products(name)values('shoes');
@@ -48,6 +48,7 @@ insert into variants(name,color,product_size,price,product_id)values('bag','pink
 
 /*Create table cart */
 
+
 create table cart(id SERIAL PRIMARY KEY,product_id int NOT NULL,variant_id int,variant_price int,user_id int NOT NULL);
 
 alter table cart add FOREIGN KEY (product_id) REFERENCES products(id);
@@ -62,7 +63,6 @@ alter table cart add FOREIGN KEY (user_id) REFERENCES users(id);
 create table payments(id SERIAL,payment_mode varchar(20),order_id SERIAL PRIMARY KEY,payment_status varchar(20),transaction_date date,user_id int NOT NULL);
 
 alter table payments add FOREIGN KEY (user_id) REFERENCES users(id);
-
 
 /*Create table orders*/
 
@@ -83,21 +83,51 @@ create table discounts(id SERIAL PRIMARY KEY,name varchar(20),percentage int);
 
 alter table orders add FOREIGN KEY (discount_id) REFERENCES discounts(id);
 
-/*Inser data into tables */
+insert into discounts(name,percentage) values('flat',10);
+
+insert into discounts(name,percentage) values('extra',5);
+
+/*Stored procedure for add to cart*/
+
+CREATE OR REPLACE FUNCTION add_cart(prod_id integer,var_id integer,var_price integer,userid integer)
+RETURNS void AS $$
+DECLARE
+	status varchar(20);
+BEGIN
+	insert into cart(product_id,variant_id,variant_price,user_id)values(prod_id,var_id,var_price,userid);
+END;
+$$ LANGUAGE PLPGSQL;
+
+select add_cart(1,1,400,1);
 
 
+/*Stored proocedure for payment*/
 
 
+CREATE OR REPLACE FUNCTION make_payment(payment_mode varchar(20),payment_status varchar(20),transaction_date date,user_id int)
+RETURNS void AS $$
+DECLARE
+disco integer; 
+total integer;
+per integer;
+BEGIN
+SELECT sum(variant_price) into total from cart;
+select percentage into per from discounts where id=1;
+disco := total*per/100;
+insert into payments(payment_mode,payment_status,transaction_date,user_id)values(payment_mode,payment_status,transaction_date,user_id);
+insert into orders(order_price,discount_id,discount_price,product_id,variant_id,user_id,order_status)values (total,1,disco,1,1,1,'Success');
+truncate table cart;
+END;
+$$ LANGUAGE PLPGSQL;
 
 
+select make_payment('credit card','success',current_date,1);
 
+/* view */
 
+create view product_details as select id,order_price,discount_price,order_status from orders;
 
+/*report*/
 
-
-/*
-insert into cart(product_id,variant_id,variant_price,user_id) select variants.product_id,variants.id,variants.price,users.id from variants INNER JOIN users ON users.id=1;
-
-*/
-
+select id,payment_mode,payment_status,transaction_date,user_id from payments where transaction_date between '2018-09-19' AND '2018-10-18';
 
